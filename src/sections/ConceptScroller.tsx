@@ -40,6 +40,11 @@ const scrollerImages = [
 export default function ConceptScroller() {
   const sectionRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+  const dragStartX = useRef(0)
+  const dragStartScrollY = useRef(0)
+  const minScroll = useRef(0)
+  const maxScroll = useRef(0)
 
   useEffect(() => {
     const section = sectionRef.current
@@ -87,11 +92,53 @@ export default function ConceptScroller() {
       })
     }, section)
 
-    return () => ctx.revert()
+    const handlePointerDown = (e: PointerEvent) => {
+      isDragging.current = true
+      dragStartX.current = e.clientX
+      dragStartScrollY.current = window.scrollY
+
+      const currentTotalWidth = container.scrollWidth - window.innerWidth
+      minScroll.current = section.offsetTop
+      maxScroll.current = section.offsetTop + currentTotalWidth
+
+      section.style.cursor = 'grabbing'
+      section.style.userSelect = 'none'
+      section.setPointerCapture?.(e.pointerId)
+    }
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDragging.current) return
+      const dx = dragStartX.current - e.clientX
+      let newScrollY = dragStartScrollY.current + dx
+      newScrollY = Math.max(minScroll.current, Math.min(maxScroll.current, newScrollY))
+      window.scrollTo(0, newScrollY)
+    }
+
+    const handlePointerUp = () => {
+      if (!isDragging.current) return
+      isDragging.current = false
+      section.style.cursor = 'grab'
+      section.style.userSelect = ''
+    }
+
+    section.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      ctx.revert()
+      section.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
   }, [])
 
   return (
-    <section ref={sectionRef} className="relative h-screen overflow-hidden bg-[#0C243B]">
+    <section
+      ref={sectionRef}
+      className="relative h-screen overflow-hidden bg-[#0C243B]"
+      style={{ cursor: 'grab', touchAction: 'pan-y' }}
+    >
       {/* Left gradient overlay */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[15%] z-10 pointer-events-none"
